@@ -1,4 +1,4 @@
-# Vivado generated files and directories
+# Vivado generated files and folders
 *.jou
 *.log
 *.str
@@ -7,26 +7,43 @@
 *.xml
 *.html
 
-.cache/
-.hw/
-.ip_user_files/
-.runs/
-.sim/
-.webtalk/
-.xpr.lock
+# Run folders and cache
+*.runs/
+*.cache/
+*.hw/
+*.ip_user_files/
+*.webtalk/
+
+# Simulation folders and files
+*.sim/
 *.wdb
 *.vcd
 
-# Temporary/editor junk
-*~
-*.tmp
+# Project lock files
+*.xpr.lock
+
+# OS junk
 .DS_Store
 Thumbs.db
 
-# Optional: ignore Vivado project file if you don’t want it tracked
-#*.xpr
+# Editor and temp files
+*~
+*.tmp
 
-# Optional: ignore all except source folders
-# !hdl/
-# !constraints/
-# !scripts/
+# Specific Vivado subfolders
+cpu.cache/
+cpu.hw/
+cpu.runs/
+cpu.sim/
+
+# Ignore all .bit files and bitstream folders (if any)
+*.bit
+
+# Optional: Ignore all but specific folders (uncomment if you want strict control)
+ !/*.v
+ !/cpu.srcs/
+ !/*.xdc
+ !/.gitignore
+ !/README.md
+!/cpu.ip_user_files/
+
