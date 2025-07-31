@@ -18,6 +18,7 @@
 *.sim/
 *.wdb
 *.vcd
+*.dcp
 
 # Project lock files
 *.xpr.lock
