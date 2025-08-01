@@ -19,7 +19,6 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-//test
 module multiplier(
     input clk,
     input reset,
@@ -28,19 +27,21 @@ module multiplier(
     input ack,
     input [31:0] in1,
     input [31:0] in2,
+    input sign,
     
     output reg [63:0] result,
     output reg product_ready,
-    output reg zero
+    output reg zero,
+    output reg neg
     );
     
     //internal - captures state on start
     reg [31:0] multiplicand;
-    reg [63:0]  temp;
+    reg [63:0]  temp, temp1;
     reg [5:0] count;         
     reg busy;
     reg op_done;
-    
+    reg prod_sign;
     
     always @(posedge clk or posedge reset) begin
         if (reset) begin
@@ -51,16 +52,22 @@ module multiplier(
             op_done         <= 1'b0;
             product_ready   <= 1'b0;
             zero <= 1'b0;
+            neg <= 1'b0;
+            prod_sign <= 0;
+
         end
         else begin
             if (start && !busy && !ack && !product_ready) begin
-                multiplicand <= in1;
+                multiplicand <= (sign && in1[31]) ? -in1 : in1;
                 count        <= 6'd0;
-                result <= {32'd0, in2};
+                result <= (sign && in2[31]) ? {32'd0, -in2} : {32'd0, in2};
                 busy         <= 1'b1;
                 op_done         <= 1'b0;
                 product_ready <= 1'b0;
                 zero <= 1'b0;
+                neg <= 1'b0;
+
+                prod_sign <= (in2[31] ^ in1[31]) && sign;
 
             end
             else if (busy) begin
@@ -70,12 +77,18 @@ module multiplier(
                 else begin
                     temp = result >> 1;
                 end
-                result <= temp;
                 count <= count + 1;
                 if (count == 6'd31) begin //pretty sure can make it 30
                     product_ready <= 1'b1;
+                    temp1= prod_sign ? -temp : temp;
+                    result <= temp1;
+                    neg <= temp1[63];
+
                     zero <= (temp == 64'b0);
                     busy <= 1'b0;
+                end
+                else begin
+                    result <= temp;
                 end
             end
             else if (product_ready) begin

@@ -9,11 +9,13 @@ module multiplier_tb;
     reg ack = 0;
     reg [31:0] in1 = 0;
     reg [31:0] in2 = 0;
+    reg sign;
+
     
     wire [63:0] result;
     wire product_ready;
     wire zero;
-
+    wire neg;
     // Instantiate DUT
     multiplier uut (
         .clk(clk),
@@ -24,7 +26,9 @@ module multiplier_tb;
         .in2(in2),
         .result(result),
         .product_ready(product_ready),
-        .zero(zero)
+        .zero(zero),
+        .sign(sign),
+        .neg(neg)
     );
 
     // Clock generation
@@ -34,10 +38,12 @@ module multiplier_tb;
     task multiply_input;
         input [31:0] a;
         input [31:0] b;
+        input sign_val;
         begin
             in1 = a;
             in2 = b;
             start = 1;
+            sign = sign_val;
             @(posedge clk);  // wait 1 clock
             start = 0;
 
@@ -68,9 +74,13 @@ module multiplier_tb;
         reset = 0;
 
         // Test cases
-        multiply_input(32'd5, 32'd3);
-        multiply_input(32'd0, 32'd100);
-        multiply_input(32'd123456, 32'd654321);
+        multiply_input(32'd5, 32'd3,0);
+        multiply_input(32'd0, 32'd100,0);
+        multiply_input(32'd123456, 32'd654321,0);
+        multiply_input(-32'sd10, 32'sd12,1);
+        multiply_input(32'sd10, 32'sd12,1);
+
+
 
         // Unsigned MSB = 1 (large unsigned)
 //        multiply_input(32'hFFFF_FFFF, 32'd2);
