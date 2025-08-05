@@ -11,6 +11,7 @@
 *.runs/
 *.cache/
 *.hw/
+*.gen/
 *.ip_user_files/
 *.webtalk/
 
@@ -38,13 +39,13 @@ cpu.runs/
 cpu.sim/
 
 # Ignore all .bit files and bitstream folders (if any)
-*.bit
+!/*.bit
 
 # Optional: Ignore all but specific folders (uncomment if you want strict control)
  !/*.v
  !/cpu.srcs/
  !/*.xdc
+ !/*/.xci
  !/.gitignore
  !/README.md
-!/cpu.ip_user_files/
 
