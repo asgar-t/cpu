@@ -14,7 +14,7 @@
 *.gen/
 *.ip_user_files/
 *.webtalk/
-
+*sim_1/
 # Simulation folders and files
 *.sim/
 *.wdb
@@ -22,7 +22,7 @@
 *.dcp
 
 # Project lock files
-*.xpr.lock
+*.lock
 
 # OS junk
 .DS_Store
