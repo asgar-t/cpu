@@ -20,7 +20,7 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module divider_unsigned(                                                                         
+module divider_signed(                                                                         
     input clk,                                                                                   
     input [31:0] a,                                                                              
     input [31:0] b,                                                                              
@@ -53,7 +53,7 @@ module divider_unsigned(
     wire dividend_ready;                                                                           
     reg [1:0] state;                                                                             
                                                                                                  
-    unsigned_divider divider_main(                                                               
+    div_gen_0 divider_main(                                                               
         .aclk(clk),                                                                              
         .s_axis_divisor_tvalid(internal_start),
         .s_axis_dividend_tvalid(internal_start),                                                  

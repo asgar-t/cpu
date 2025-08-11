@@ -96,6 +96,15 @@ module multiplier(
 
                 if (ack) begin
                     product_ready <= 1'b0;
+                    multiplicand <= 32'd0;
+                    result       <= 64'd0;
+                    count        <= 6'd0;
+                    busy         <= 1'b0;
+                    op_done         <= 1'b0;
+                    product_ready   <= 1'b0;
+                    zero <= 1'b0;
+                    neg <= 1'b0;
+                    prod_sign <= 0;
                 end
             end
         end
