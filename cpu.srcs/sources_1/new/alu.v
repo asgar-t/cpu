@@ -23,13 +23,15 @@
 module alu(
     input clk,
     input reset,
+    input start,
     input [4:0] opcode,
     input [31:0] op1,
     input [31:0] op2,
     
     output reg [31:0] out1,
     output reg [31:0] out2,
-    output reg [3:0] flags
+    output reg [3:0] flags,
+    output reg done
 
     );
     
@@ -55,16 +57,7 @@ module alu(
     parameter ABS = 5'd18;
     parameter CMP = 5'd19;
         
-        
-     //states
-     parameter IDLE = 2'b00;
-     parameter WAITING  =2'b01;
-     parameter DONE = 2'b10;
-     
-     reg [1:0] state;
-     
-     
-     
+  
         
     
     //adder input wires    
@@ -87,7 +80,8 @@ module alu(
         .negative(adder_flags[0]),
         .zero(adder_flags[1]),
         .overflow_signed(adder_flags[2]),
-        .carry_out(adder_flags[3])
+        .carry_out(adder_flags[3]),
+        .sum(adder_output)
     );
     
     
@@ -181,6 +175,21 @@ module alu(
         .neg(divs_neg_flag)
     );
     
+          
+     //states
+     parameter IDLE = 2'b00;
+     parameter WAITING  =2'b01;
+     parameter DONE = 2'b10;
+     parameter ONE_DELAY = 2'b11;
+     
+     reg [1:0] state;
+     
+     
+     reg internal_done;
+     reg internal_start;
+     reg internal_ack;
+     
+     
     
     always @(posedge clk) begin
         if (reset) begin
@@ -208,10 +217,114 @@ module alu(
             out1 <= 0; 
             out2 <= 0;
             flags <= 0;
-            state <= 0;
+            state <= IDLE;
         end
         else begin
             case (state)
+                IDLE: begin
+                    if (start) begin
+                        case (opcode)
+                            ADD: begin
+                                adder_op1 <= op1;
+                                adder_op2 <= op2;
+                                adder_cin <= 1'b0;
+                                adder_sub <= 1'b0;
+                                out1 <= adder_output;
+                                flags <= adder_flags;
+                                state  <= DONE;
+                            end
+                            SUB : begin
+                                adder_op1 <= op1;
+                                adder_op2 <= op2;
+                                adder_cin <= 1'b0;
+                                adder_sub <= 1'b1;
+                                out1 <= adder_output;
+                                flags <= adder_flags;
+                                state <= DONE;
+                            end
+                            ADDC  : begin
+                                adder_op1 <= op1;
+                                adder_op2 <= op2;
+                                adder_cin <= flags[3];
+                                adder_sub <= 1'b0;
+                                out1 <= adder_output;
+                                flags <= adder_flags;
+                                state <= DONE;    
+                            end
+                            MULS, MULU  : begin
+                            end
+                            
+                            DIVS  : begin
+                            end
+                            DIVU  : begin
+                            end
+                            AND   : begin
+                                out1 <= op1 & op2;
+                            end
+                            OR    : begin
+                                out1 <= op1 | op2;
+                            end
+                            XOR   : begin
+                                out1 <= op1 ^ op2;
+                            end
+                            NOT   : begin
+                                out1 <= ~op1;
+                            end
+                            SL    : begin
+                                out1 <= op1 << op2;
+                            end
+                            SR    : begin
+                                out1 <= op1 >> op2;
+                            end
+                            ASR   : begin
+                                out1 <= op1 >>> op2;
+                            end
+                            INC   : begin
+                                adder_op1 <= op1;
+                                adder_op2 <= 32'b1;
+                                adder_cin <= 1'b0;
+                                adder_sub <= 1'b0;
+                                out1 <= adder_output;
+                                flags <= adder_flags;
+                                state <= DONE;  
+                            end
+                            DEC   : begin
+                                adder_op1 <= op1;
+                                adder_op2 <= 32'b1;
+                                adder_cin <= 1'b0;
+                                adder_sub <= 1'b1;
+                                out1 <= adder_output;
+                                flags <= adder_flags;
+                                state <= DONE;  
+                            end
+                            MODS  : begin
+                            end
+                            MODU  : begin
+                            end
+                            ABS   : begin
+                                out1 <= (op1 < 0) ? -op1 : op1;
+                            end
+                            CMP   : begin
+                                adder_op1 <= op1;
+                                adder_op2 <= op2;
+                                adder_cin <= 1'b0;
+                                adder_sub <= 1'b1;
+                                flags <= adder_flags;
+                                state <= DONE;
+                            end
+                            
+                        endcase
+                    end
+                end
+                
+
+                
+                WAITING: begin
+                end
+                
+                
+                DONE: begin
+                end
                 
             endcase
         end
