@@ -31,6 +31,7 @@ module alu(
     output reg [31:0] out1,
     output reg [31:0] out2,
     output reg [3:0] flags,
+    output reg div_by_zero,
     output reg done
 
     );
@@ -217,46 +218,67 @@ module alu(
             out1 <= 0; 
             out2 <= 0;
             flags <= 0;
+            div_by_zero <= 0;
             state <= IDLE;
         end
         else begin
             case (state)
                 IDLE: begin
                     if (start) begin
+
                         case (opcode)
-                            ADD: begin
+                            ADD,
+                            SUB,
+                            ADDC : begin
                                 adder_op1 <= op1;
                                 adder_op2 <= op2;
-                                adder_cin <= 1'b0;
-                                adder_sub <= 1'b0;
+                                adder_cin <= ((opcode == ADDC) && flags[3]);
+                                adder_sub <= (opcode == SUB);
                                 out1 <= adder_output;
                                 flags <= adder_flags;
                                 state  <= DONE;
                             end
-                            SUB : begin
-                                adder_op1 <= op1;
-                                adder_op2 <= op2;
-                                adder_cin <= 1'b0;
-                                adder_sub <= 1'b1;
-                                out1 <= adder_output;
-                                flags <= adder_flags;
-                                state <= DONE;
-                            end
-                            ADDC  : begin
-                                adder_op1 <= op1;
-                                adder_op2 <= op2;
-                                adder_cin <= flags[3];
-                                adder_sub <= 1'b0;
-                                out1 <= adder_output;
-                                flags <= adder_flags;
-                                state <= DONE;    
-                            end
-                            MULS, MULU  : begin
+                            MULS,
+                            MULU : begin
+                            
+                                mult_start <= internal_start;
+                                internal_start <= 1'b1;
+                                mult_op1 <= op1;
+                                mult_op2 <= op2;
+                                mult_sign <= (opcode == MULS);  
+                                internal_done <= mult_product_ready;
+                                {out2, out1} <= mult_result;
+                                state <= WAITING;    
+                                       
                             end
                             
                             DIVS  : begin
+                                divs_op1 <= op1;
+                                divs_op2 <= op2;
+                                divs_start <= internal_start; 
+                                internal_start <= 1;    
+                                divs_ack <= internal_ack;   
+                                internal_done <= divs_done;
+                                {out2,out1} <= {divs_remain, divs_quot};
+                                div_by_zero <= divs_div_by_zero;
+                                flags <= {2'b0, divs_zero_flag, 1'b0};
+                                state <= WAITING;    
+                                                            
+                            
                             end
                             DIVU  : begin
+                                divu_op1 <= op1;
+                                divu_op2 <= op2;
+                                divu_start <= internal_start; 
+                                internal_start <= 1;    
+                                divu_ack <= internal_ack;   
+                                internal_done <= divu_done;
+                                {out2,out1} <= {divu_remain, divu_quot};
+                                div_by_zero <= divu_div_by_zero;
+                                flags <= {2'b0, divu_zero_flag, 1'b0};
+                                state <= WAITING;    
+                                                       
+                            
                             end
                             AND   : begin
                                 out1 <= op1 & op2;
@@ -320,6 +342,7 @@ module alu(
 
                 
                 WAITING: begin
+                    internal_start <= 1'b0;
                 end
                 
                 

@@ -37,7 +37,7 @@ module adder(
     
     assign {carry_out, sum} = in1 + op2 + carry;
     assign overflow_signed = (in1[31] == op2[31]) && (sum[31] != in1[31]);
-    assign negative = sum[31];
+    assign negative = sum[31] && (!sub);
     assign zero = (sum == 0);
     
     
