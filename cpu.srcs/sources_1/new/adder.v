@@ -25,20 +25,32 @@ module adder(
     input [31:0] in2,
     input sub,
     input carry_in,
-    output negative,
-    output zero,
-    output overflow_signed,
-    output carry_out,
-    output [31:0] sum
+    input clk,
+    output reg negative,
+    output reg zero,
+    output reg overflow_signed,
+    output reg carry_out,
+    output reg [31:0] sum
     );
     
     wire [31:0] op2 = sub ? ~in2 : in2;
     wire carry  = sub ? 1'b1 : carry_in;
     
-    assign {carry_out, sum} = in1 + op2 + carry;
-    assign overflow_signed = (in1[31] == op2[31]) && (sum[31] != in1[31]);
-    assign negative = sum[31] && (!sub);
-    assign zero = (sum == 0);
+    reg [31:0] tmp_sum;
+    reg tmp_carry;
+
+    always @(*) begin
+
+        
+        {tmp_carry, tmp_sum} = in1 + op2 + carry;
+    
+        carry_out       = tmp_carry;
+        sum             = tmp_sum;
+        overflow_signed = (in1[31] == op2[31]) && (tmp_sum[31] != in1[31]);
+        negative        = tmp_sum[31] && (!sub);
+        zero            = (tmp_sum == 0);
+    end
+
     
     
     

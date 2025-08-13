@@ -84,7 +84,7 @@ module multiplier(
                     result <= temp1;
                     neg <= temp1[63];
 
-                    zero <= (temp == 64'b0);
+                    zero <= (temp1 == 64'b0);
                     busy <= 1'b0;
                 end
                 else begin
