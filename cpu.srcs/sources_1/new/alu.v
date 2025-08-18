@@ -126,7 +126,6 @@ module alu(
     wire divu_done;
     wire [31:0] divu_quot;
     wire [31:0] divu_remain;
-    wire divu_div_by_zero;
     wire divu_zero_flag;
     
     divider_unsigned alu_divu(
@@ -139,7 +138,6 @@ module alu(
         .done(divu_done),
         .quot(divu_quot),
         .remainder(divu_remainder),
-        .div_by_zero(divu_div_by_zero),
         .zero(divu_zero_flag)
     );
     
@@ -157,7 +155,6 @@ module alu(
     wire divs_done;
     wire [31:0] divs_quot;
     wire [31:0] divs_remain;
-    wire divs_div_by_zero;
     wire divs_zero_flag;
     wire divs_neg_flag;
     
@@ -171,7 +168,6 @@ module alu(
         .done(divs_done),
         .quot(divs_quot),
         .remainder(divs_remainder),
-        .div_by_zero(divs_div_by_zero),
         .zero(divs_zero_flag),
         .neg(divs_neg_flag)
     );
@@ -255,22 +251,40 @@ module alu(
                             end
                             
                             DIVS  : begin
-                                divs_op1 <= op1;
-                                divs_op2 <= op2;
-                                divs_start <= 1'b1;    
+                                
+                                if(op2 == 0)begin
+                                    div_by_zero <= 1'b1;
+                                    done<=1'b1;
+                                    state <= DONE;
 
-                                state <= WAITING;    
-                                                            
+                                end                            
+                            
+                                else begin
+                                    divs_op1 <= op1;
+                                    divs_op2 <= op2;
+                                    divs_start <= 1'b1;    
+    
+                                    state <= WAITING;
+                                end              
                             
                             end
                             DIVU  : begin
-                                divu_op1 <= op1;
-                                divu_op2 <= op2;
-                                divu_start <=  1'b1;    
-                   
-                                state <= WAITING;    
-                                                       
                             
+                                if(op2 == 0)begin
+                                    div_by_zero <= 1'b1;
+                                    done<=1'b1;
+
+                                    state <= DONE;
+
+                                end                            
+                            
+                                else begin
+                                    divu_op1 <= op1;
+                                    divu_op2 <= op2;
+                                    divu_start <= 1'b1;    
+    
+                                    state <= WAITING;
+                                end  
                             end
                             AND,
                             OR,
@@ -288,6 +302,8 @@ module alu(
                                 adder_op2 <= 32'b1;
                                 adder_cin <= 1'b0;
                                 adder_sub <= 1'b0;
+                                internal_done <= 1'b1;
+
                                 state <= DONE;  
                             end
                             DEC   : begin
@@ -295,6 +311,7 @@ module alu(
                                 adder_op2 <= 32'b1;
                                 adder_cin <= 1'b0;
                                 adder_sub <= 1'b1;
+                                internal_done <= 1'b1;
 
                                 state <= DONE;  
                             end
@@ -311,6 +328,8 @@ module alu(
                                 adder_cin <= 1'b0;
                                 adder_sub <= 1'b1;
                                 flags <= adder_flags;
+                                internal_done <= 1'b1;
+
                                 state <= DONE;
                             end
                             
@@ -425,14 +444,12 @@ module alu(
                 {out2,out1} = {divu_remain, divu_quot};
                 divu_ack = internal_ack;   
                 internal_done = divu_done;
-                div_by_zero = divu_div_by_zero;
                 flags = {2'b0, divu_zero_flag, 1'b0};
            end
            DIVS: begin
                 {out2,out1} = {divs_remain, divu_quot};
                 divs_ack = internal_ack;   
                 internal_done = divs_done;
-                div_by_zero = divs_div_by_zero;
                 flags = {2'b0, divs_zero_flag, 1'b0};
            end
            ABS: begin

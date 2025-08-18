@@ -78,7 +78,7 @@ module multiplier(
                     temp = result >> 1;
                 end
                 count <= count + 1;
-                if (count == 6'd31) begin //pretty sure can make it 30
+                if (count == 6'd31) begin 
                     product_ready <= 1'b1;
                     temp1= prod_sign ? -temp : temp;
                     result <= temp1;

@@ -31,7 +31,6 @@ module divider_signed(
     output reg done,                                                                             
     output reg [31:0] quot,                                                                      
     output reg [31:0] remainder,                                                                 
-    output reg div_by_zero,
     output div_ready,   
     output reg neg,                                                                   
     output reg zero                                                                              
@@ -73,7 +72,6 @@ module divider_signed(
         if (reset) begin                                                                         
             quot <= 0;                                                                        
             remainder <= 0;                                                                       
-            div_by_zero <= 0;                                                                 
             done <= 0; 
             zero <= 0;                                                                  
             state <= IDLE; 
@@ -87,19 +85,10 @@ module divider_signed(
                                                                           
                     if (start || internal_start) begin  
                                               
-                        if (b == 0) begin                                                            
-                            done <= 1'b1;                                                            
-                            state <= DONE;                                                           
-                            div_by_zero <= 1'b1;  
-                            remainder <= 0;                                                    
-                            quot <= 0;     
-                            internal_reset = 1;                                              
-                        end                                                                          
-                        else begin                                                                   
+                                                                          
                             done <= 1'b0;                                                            
                             dividend <= a;                                                           
                             divisor <= b;
-                            div_by_zero <= 1'b0;
                             internal_start <= 1'b1;  
                                                    
                             if (div_ready) begin                                
@@ -107,7 +96,6 @@ module divider_signed(
                                 internal_start <= 1'b0;
 
                             end                                                     
-                        end                                                                          
                     end  
                     else begin
                         state <= IDLE;
@@ -128,7 +116,6 @@ module divider_signed(
                 DONE: begin    
                     if (ack) begin                                                                   
                         done <= 1'b0;                                                                
-                        div_by_zero <= 1'b0;                                                         
                         state <= IDLE; 
                         internal_reset = 0;  
                         neg <= 0;                                                                    
