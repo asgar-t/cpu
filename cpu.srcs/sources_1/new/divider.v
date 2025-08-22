@@ -91,9 +91,9 @@ module divider_signed(
                             divisor <= b;
                             internal_start <= 1'b1;  
                                                    
-                            if (div_ready) begin                                
-                                state <= DIVIDING;  
+                            if (div_ready && internal_start) begin 
                                 internal_start <= 1'b0;
+                                state <= DIVIDING;  
 
                             end                                                     
                     end  
@@ -101,11 +101,12 @@ module divider_signed(
                         state <= IDLE;
                     end                                                                            
                 end                                                                                  
-                DIVIDING: begin                           
+                DIVIDING: begin  
+                         
                     if (internal_done) begin                                                         
                         remainder <= div_result[31:0];                                                    
                         quot <= div_result[63:32];                                              
-                        zero <= (div_result [31:0] == 0);  
+                        zero <= (div_result [63:32] == 0);  
                         neg <= div_result[63];                                          
                         done <= 1'b1;                                                                
                         state <= DONE;

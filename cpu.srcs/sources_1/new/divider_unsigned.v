@@ -82,16 +82,17 @@ module divider_unsigned(
                 IDLE: begin
                     internal_reset <= 1'b0;                                                           
                                                                           
-                    if (start || internal_start) begin  
-                                                                        
+                      if (start || internal_start) begin  
+                                              
+                                                                          
                             done <= 1'b0;                                                            
                             dividend <= a;                                                           
                             divisor <= b;
                             internal_start <= 1'b1;  
                                                    
-                            if (div_ready) begin                                
+                            if (div_ready && internal_start) begin                                
                                 state <= DIVIDING;  
-                                internal_start <= 1'b0;
+                                internal_start <= 1'b0;                          
 
                             end                                                     
                     end  
@@ -99,11 +100,11 @@ module divider_unsigned(
                         state <= IDLE;
                     end                                                                            
                 end                                                                                  
-                DIVIDING: begin                           
+                DIVIDING: begin 
                     if (internal_done) begin                                                         
                         remainder <= div_result[31:0];                                                    
                         quot <= div_result[63:32];                                              
-                        zero <= (div_result [31:0] == 0);                                            
+                        zero <= (div_result [63:32] == 0);                                            
                         done <= 1'b1;                                                                
                         state <= DONE;
                                                      
@@ -125,7 +126,11 @@ module divider_unsigned(
                                                                                                      
             endcase
         end                                                                                  
-    end                                                                                          
+    end   
+    always @(*) begin
+        dividend = a;                                                           
+        divisor = b;
+    end                                                                                                                                                                           
                                                                                                  
-endmodule                                                                                        
-                                                                                                 
+endmodule
+

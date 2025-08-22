@@ -137,7 +137,7 @@ module alu(
         .ack(divu_ack),
         .done(divu_done),
         .quot(divu_quot),
-        .remainder(divu_remainder),
+        .remainder(divu_remain),
         .zero(divu_zero_flag)
     );
     
@@ -167,7 +167,7 @@ module alu(
         .ack(divs_ack),
         .done(divs_done),
         .quot(divs_quot),
-        .remainder(divs_remainder),
+        .remainder(divs_remain),
         .zero(divs_zero_flag),
         .neg(divs_neg_flag)
     );
@@ -250,7 +250,8 @@ module alu(
                                        
                             end
                             
-                            DIVS  : begin
+                            DIVS,
+                            MODS  : begin
                                 
                                 if(op2 == 0)begin
                                     div_by_zero <= 1'b1;
@@ -268,6 +269,7 @@ module alu(
                                 end              
                             
                             end
+                            MODU,
                             DIVU  : begin
                             
                                 if(op2 == 0)begin
@@ -295,7 +297,7 @@ module alu(
                             ASR,
                             ABS   : begin
                                 internal_done <= 1'b1;
-                                state <= done;
+                                state <= WAITING;
                             end
                             INC   : begin
                                 adder_op1 <= op1;
@@ -304,7 +306,7 @@ module alu(
                                 adder_sub <= 1'b0;
                                 internal_done <= 1'b1;
 
-                                state <= DONE;  
+                                state <= WAITING;  
                             end
                             DEC   : begin
                                 adder_op1 <= op1;
@@ -313,15 +315,10 @@ module alu(
                                 adder_sub <= 1'b1;
                                 internal_done <= 1'b1;
 
-                                state <= DONE;  
+                                state <= WAITING;  
                             end
-                            MODS  : begin
-                            end
-                            MODU  : begin
-                            end
-                            ABS   : begin
-                                
-                            end
+
+
                             CMP   : begin
                                 adder_op1 <= op1;
                                 adder_op2 <= op2;
@@ -330,7 +327,7 @@ module alu(
                                 flags <= adder_flags;
                                 internal_done <= 1'b1;
 
-                                state <= DONE;
+                                state <= WAITING;
                             end
                             
                         endcase
@@ -408,29 +405,44 @@ module alu(
             INC,
             DEC: begin
                 out1 = adder_output;
+                out2 = 0;
                 flags = adder_flags;
 
             end
             AND   : begin
                out1 = op1 & op2;
+               out2 = 0;
+
            end
            OR    : begin
                out1 = op1 | op2;
+               out2 = 0;
+
            end
            XOR   : begin
                out1 = op1 ^ op2;
+               out2 = 0;
+
            end
            NOT   : begin
                out1 = ~op1;
+               out2 = 0;
+
            end
            SL    : begin
                out1 = op1 << op2;
+               out2 = 0;
+
            end
            SR    : begin
                out1 = op1 >> op2;
+               out2 = 0;
+
            end
            ASR   : begin
                out1 = op1 >>> op2;
+               out2 = 0;
+
            end 
            MULU,
            MULS: begin
@@ -447,14 +459,34 @@ module alu(
                 flags = {2'b0, divu_zero_flag, 1'b0};
            end
            DIVS: begin
-                {out2,out1} = {divs_remain, divu_quot};
+                {out2,out1} = {divs_remain, divs_quot};
                 divs_ack = internal_ack;   
                 internal_done = divs_done;
                 flags = {2'b0, divs_zero_flag, 1'b0};
            end
            ABS: begin
-                out1 = (op1 < 0) ? -op1 : op1;
+                out1 = (op1[31]) ? -op1 : op1;
+                out2 = 0;
            end 
+           MODS: begin
+                out1 = divs_remain;
+                divs_ack = internal_ack;
+                internal_done = divs_done;
+                out2 = 0;
+
+           end
+           MODU: begin
+                out1 = divu_remain;
+                divu_ack = internal_ack;
+                internal_done = divu_done;
+                out2 = 0;
+
+           end
+
+           CMP : begin
+                flags = adder_flags;
+
+           end
 
             
         endcase
