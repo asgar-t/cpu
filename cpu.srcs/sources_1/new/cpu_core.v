@@ -41,14 +41,27 @@
 //      [18:16] SOURCE REG
 //      [20:19] RESERVED
 
+// if MEM->R or R-> MEM
+//      [4:0] OPCODE
+//      [10:5] RESERVED
+//      [13:11] DEST/SRC REG
+//      [15:14] RESERVED
+
+//if val ->IMM
+//      [4:0] OPCODE
+//      [10:5] RESERVED
+//      [26:11] val
 
 
-
-module cpu_core(
+module cpu_core( //will add more outputs for debug led feature
     input sys_clk,
     input reset,
     output result
     );
+    
+    
+    //first part of this module is just declaring the different alu components, as well as 
+    //instantiating ip cores for ROM and RAM
     
     reg alu_op1;
      reg alu_op2;
@@ -116,9 +129,11 @@ module cpu_core(
      );
      
      
+     //registers
+     reg [31:0] regs [0:15];
      
-     reg [31:0] regs [0:10];
      
+     //general purpose
      parameter R1 = 4'd0;
      parameter R2 = 4'd2;
      parameter R3 = 4'd3;
@@ -127,66 +142,107 @@ module cpu_core(
      parameter R6 = 4'd6;
      parameter R7 = 4'd7;
      
+     //special, cant write to directly, needs to be loaded from
+     //other register
      parameter BP = 4'd8;
      parameter SI = 4'd9;
      parameter SP = 4'd10;
-     parameter IM = 4'd11;
+     parameter IMM = 4'd11;
+         
      
+     //will only be available in intermediate representation, only used for
+     //in between steps. The assembly language will not have access to these
      parameter ADDR = 4'd12;
      parameter THROW = 4'd13;
      parameter EX1 = 4'd14;
      parameter EX2 = 4'd15;
      
      //opcodes
+     //opcodes less than 20 are for the alu
      parameter LIL = 5'd20; //load imm lower
      parameter LIU = 5'd21;
      parameter RTM = 5'd22; // reg to mem
-     parameter MTR = 5'd23;
-     parameter RTR = 5'd24;
+     parameter MTR = 5'd23;//mem to register
+     parameter RTR = 5'd24;//register to register
      parameter LAL = 5'd25; // load addr lower
-     parameter JAU = 5'd26;
-     parameter JZ  = 5'd27;
+     parameter LAU = 5'd26;
+     parameter JZ  = 5'd27;//jump instructions
      parameter JNE = 5'd28;
      parameter JE  = 5'd29;
      parameter JGT = 5'd30;
      parameter JLT = 5'd31;
-               
+              
+              
+    //sattes         
     reg [1:0] state;
     
     parameter START = 2'b00;
     parameter WAITING = 2'b01;
-    
+    parameter ONE_DELAY = 2'b10;
     
     always @(posedge sys_clk or posedge reset) begin
     
         if (reset) begin
-            rom_addr <= 0;
+            rom_addr <= 0; //reset rom address, and therefore instruction register as well
             
         end
         else begin
         
             if(state == START) begin
+                ram_we = 4'b0;//reset ram write incase we want to read only
+                
                 if (inst_reg[4:0] < 20) begin
+                //alu operation, give opcode and start instruction
+                    alu_opcode <= inst_reg[4:0];
                     alu_start <= 1;
                     state <= WAITING;
                 end
+                //other cases
                 case (inst_reg[4:0])
                     LIL: begin
-                        
+                        //load lower bits of register with cooresponding value
+                        regs[IMM][15:0] <= inst_reg[26:11];
+                        rom_addr <= rom_addr +1; //increment instruction pointer
                     end
-                    LIL: begin
-                    end
+                    
+                    //same as above but for upper bits
                     LIU: begin
+                        regs[IMM][31:16] <= inst_reg[26:11];
+                        rom_addr <= rom_addr +1; 
                     end
+                    //register to memory
                     RTM: begin
+                        //write enable all 4 bytes, 
+                        //next version will have specific byte write enabled
+                        ram_we <=4'b1111;
+                        ram_en <= 1'b1;
+                        //uses address register for where to write
+                        ram_addr <= regs[ADDR];
+                        
+                        //data fed by registed designated by instructino
+                        ram_din <= regs[inst_reg[13:11]];
+                        state <= ONE_DELAY; //ram access takes one cycle
                     end
                     MTR: begin
+                    //write enable is 0 for read only
+                        ram_we <= 4'b0;
+                        ram_en <= 1'b1;
+                        ram_addr <= regs[ADDR];
+                        regs[inst_reg[13:11]] <= ram_dout;
+                        state <= ONE_DELAY; //ram access takes one delay
                     end
+                    
+                    //
                     RTR: begin
+                        regs[inst_reg[13:11]] <= regs[inst_reg[18:16]];
                     end
+                    
+                    //reset is a work in progress
                     LAL: begin
+                        regs[ADDR][15:0] <= inst_reg[26:11];
+                        
                     end
-                    JAU: begin
+                    LAU: begin
                     end
                     JZ : begin
                     end
@@ -206,7 +262,7 @@ module cpu_core(
             if (state == WAITING) begin
                 alu_start <= 1'b0;
                 if (alu_done) begin
-                    regs[
+                    //regs[
                     
                 end
                 else begin

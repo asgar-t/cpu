@@ -37,7 +37,7 @@ module divider_unsigned(
     );                                                                                           
     wire nreset;
     reg internal_reset;
-    assign nreset = !(reset || internal_reset);                                                                                      
+    assign nreset = !(reset || internal_reset);    //reset can be triggered internally or externally                                                                                  
     parameter IDLE = 2'b00;                                                                      
     parameter DIVIDING = 2'b01;                                                                  
     parameter DONE = 2'b11;                                                                      
@@ -67,7 +67,7 @@ module divider_unsigned(
     assign div_ready = dividend_ready && divisor_ready;
                                                                              
     always @(posedge clk) begin                                                 
-                                                                                                 
+               //reset values                                                                                  
         if (reset) begin                                                                         
             quot <= 0;                                                                        
             remainder <= 0;                                                                       
@@ -80,16 +80,19 @@ module divider_unsigned(
         else begin                                                                                     
             case (state)                                                                             
                 IDLE: begin
-                    internal_reset <= 1'b0;                                                           
-                                                                          
+                    internal_reset <= 1'b0;
+                    //if start signal is sent, prepare for start                                        
                       if (start || internal_start) begin  
                                               
                                                                           
                             done <= 1'b0;                                                            
                             dividend <= a;                                                           
                             divisor <= b;
-                            internal_start <= 1'b1;  
-                                                   
+                            //in case div_ready is 0, we can keep checking since
+                            // the previous condition checks for start or internal_start
+                            internal_start <= 1'b1;
+                            
+                            //set start to low, change state
                             if (div_ready && internal_start) begin                                
                                 state <= DIVIDING;  
                                 internal_start <= 1'b0;                          
@@ -101,6 +104,7 @@ module divider_unsigned(
                     end                                                                            
                 end                                                                                  
                 DIVIDING: begin 
+                //wait until division is done, set values
                     if (internal_done) begin                                                         
                         remainder <= div_result[31:0];                                                    
                         quot <= div_result[63:32];                                              
@@ -111,7 +115,7 @@ module divider_unsigned(
                                                              
                     end                                                                              
                 end                                                                                  
-                DONE: begin    
+                DONE: begin    //once acknowledgement is set, we can reset to idle
                     if (ack) begin                                                                   
                         done <= 1'b0;                                                                
                         state <= IDLE; 

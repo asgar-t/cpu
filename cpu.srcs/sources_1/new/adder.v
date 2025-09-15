@@ -32,10 +32,13 @@ module adder(
     output reg carry_out,
     output reg [31:0] sum
     );
-    
+    //if adder is set to subtract mode, then set op2 to ~in2 (second argument)
+    //if sub is 1, then we are subtracting, and setting carry_in to one completes the twos complement
+    //carry_in in case of ADC, add with carry
     wire [31:0] op2 = sub ? ~in2 : in2;
     wire carry  = sub ? 1'b1 : carry_in;
     
+ 
     reg [31:0] tmp_sum;
     reg tmp_carry;
 
@@ -46,6 +49,8 @@ module adder(
     
         carry_out       = tmp_carry;
         sum             = tmp_sum;
+        //signed overflow occurs if the two operations are the same sign
+        //and the output has a different sign
         overflow_signed = (in1[31] == op2[31]) && (tmp_sum[31] != in1[31]);
         negative        = tmp_sum[31] && (!sub);
         zero            = (tmp_sum == 0);

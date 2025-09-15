@@ -190,7 +190,7 @@ module alu(
      reg [3:0] flags;
     
     always @(posedge clk) begin
-        if (reset) begin
+        if (reset) begin //reset values
             adder_op1 <= 0; 
             adder_op2 <= 0;  
             adder_sub <= 0;         
@@ -212,8 +212,7 @@ module alu(
             divs_start <=0;
             divs_ack <= 0; 
             
-//            out1 <= 0; 
-//            out2 <= 0;
+
             flags <= 0;
             done <= 0;
             div_by_zero <= 0;
@@ -224,10 +223,12 @@ module alu(
         end
         else begin
             case (state)
-                IDLE: begin
-                    if (start) begin
+                IDLE: begin //if we are waiting
+                    if (start) begin //get start signal
 
                         case (opcode)
+                            //for these casses, supply inputs to the adder, change sattes
+                            //will only take one cycle
                             ADD,
                             SUB,
                             ADDC : begin
@@ -236,24 +237,29 @@ module alu(
                                 adder_cin <= ((opcode == ADDC) && flags[3]);
                                 adder_sub <= (opcode == SUB);
                                 state  <= WAITING;
-                                internal_done <= 1;
+                                internal_done <= 1; //set because of only 1 cycle delay,
+                                //the module that does this (adder) does not have a done flag, so we set it manually
+                                
                             end
+                            //for these cases. supply inputs and start signal to multiplier
                             MULS,
                             MULU : begin
                             
                                 mult_start <= 1'b1;
                                 mult_op1 <= op1;
                                 mult_op2 <= op2;
-                                mult_sign <= (opcode == MULS);
+                                mult_sign <= (opcode == MULS); //signed or unsigned depedning on opcode
   
                                 state <= WAITING;    
                                        
                             end
                             
+                            //division and mod is pretty much the same, just which ouptut we care about 
+                            
                             DIVS,
                             MODS  : begin
                                 
-                                if(op2 == 0)begin
+                                if(op2 == 0)begin //check for div by zero
                                     div_by_zero <= 1'b1;
                                     done<=1'b1;
                                     state <= DONE;
@@ -269,10 +275,12 @@ module alu(
                                 end              
                             
                             end
+                            
+                            //once again, same as before but for unsigned division
                             MODU,
                             DIVU  : begin
                             
-                                if(op2 == 0)begin
+                                if(op2 == 0)begin //check for div by zero
                                     div_by_zero <= 1'b1;
                                     done<=1'b1;
 
@@ -288,6 +296,9 @@ module alu(
                                     state <= WAITING;
                                 end  
                             end
+                            
+                            //these are just logical, and are handled in the 
+                            //a;ways@(*) block at the bottom
                             AND,
                             OR,
                             XOR,
@@ -296,29 +307,32 @@ module alu(
                             SR,
                             ASR,
                             ABS   : begin
-                                internal_done <= 1'b1;
+                                internal_done <= 1'b1; //only one cycle, so signal done
                                 state <= WAITING;
                             end
+                            //adder, so similar to preevious opcodes
                             INC   : begin
                                 adder_op1 <= op1;
-                                adder_op2 <= 32'b1;
+                                adder_op2 <= 32'b1; //op2  is 1 because we are just incrementing
                                 adder_cin <= 1'b0;
                                 adder_sub <= 1'b0;
-                                internal_done <= 1'b1;
+                                internal_done <= 1'b1; //one cycle, so we set done now
 
                                 state <= WAITING;  
                             end
+                            
+                            //same as above, almost
                             DEC   : begin
                                 adder_op1 <= op1;
                                 adder_op2 <= 32'b1;
                                 adder_cin <= 1'b0;
-                                adder_sub <= 1'b1;
+                                adder_sub <= 1'b1; //set to 1 because we are subtracting one
                                 internal_done <= 1'b1;
 
                                 state <= WAITING;  
                             end
 
-
+                            //[same as subtract, differences are handled in the always@(*) block
                             CMP   : begin
                                 adder_op1 <= op1;
                                 adder_op2 <= op2;
@@ -333,18 +347,21 @@ module alu(
                         endcase
                     end
                 end
-                
-                ONE_DELAY: begin
+                //extra state from previous development, not relevant
+//                ONE_DELAY: begin
 
-                    internal_done <= 1'b1;
-                    state <= WAITING;
-                end
+//                    internal_done <= 1'b1;
+//                    state <= WAITING;
+//                end
                 
                 WAITING: begin
+                //set start signals low
                     mult_start <= 1'b0;
                     divu_start <= 1'b0;
                     divs_start <= 1'b0;
                     if (internal_done) begin
+                        //assign outputs and done flag when the operation is complete,
+                        //set internal_ack for divider and multiplier modules
                         done <= 1'b1;
                         {fout2,fout1} <= {out2, out1};
                         fflags <= flags;
@@ -356,8 +373,8 @@ module alu(
                 
                 
                 DONE: begin
-                    internal_ack <= 1'b0;
-                   
+                    internal_ack <= 1'b0; //set low so we are not constantly acknowledging
+                   //reset values
                     if (ack) begin
                          adder_op1 <= 0; 
                          adder_op2 <= 0;  
@@ -380,13 +397,11 @@ module alu(
                          divs_start <=0;
                          divs_ack <= 0; 
                          
-                        // out1 <= 0; 
-                     //    out2 <= 0;
+
                          div_by_zero <= 0;
                         internal_done <= 0;
                         state <= IDLE;
-                      //  out1 <= 0;
-                      //  out2 <= 0;
+
                         done <= 0;
                     end 
                 end
@@ -396,9 +411,10 @@ module alu(
     end
     
     
-    
+    //continous assignment for modules
     always @(*) begin
         case(opcode) 
+            //adder relevant modules
             ADD,
             SUB,
             ADDC,
@@ -407,7 +423,8 @@ module alu(
                 out1 = adder_output;
                 out2 = 0;
                 flags = adder_flags;
-
+            //logic operations handled here, and then
+            //final outputs get assigned synchronously
             end
             AND   : begin
                out1 = op1 & op2;
@@ -427,7 +444,7 @@ module alu(
            NOT   : begin
                out1 = ~op1;
                out2 = 0;
-
+            //not logical but handled similarly, one cycle and we dont really need much else
            end
            SL    : begin
                out1 = op1 << op2;
@@ -443,6 +460,7 @@ module alu(
                out1 = op1 >>> op2;
                out2 = 0;
 
+            //operations for multiplier modules
            end 
            MULU,
            MULS: begin
@@ -450,7 +468,7 @@ module alu(
                 mult_ack = internal_ack;
                 internal_done = mult_product_ready;
                 
-
+           //dividing modules, set similar to multiplication operations
            end
            DIVU: begin
                 {out2,out1} = {divu_remain, divu_quot};
@@ -464,10 +482,15 @@ module alu(
                 internal_done = divs_done;
                 flags = {2'b0, divs_zero_flag, 1'b0};
            end
+           
+           //absolute value, one cycle, no need for anything else
            ABS: begin
                 out1 = (op1[31]) ? -op1 : op1;
                 out2 = 0;
            end 
+           
+           //similar to division but we assign out1, which is the main output, to the
+           //remained output of the divider
            MODS: begin
                 out1 = divs_remain;
                 divs_ack = internal_ack;
@@ -475,6 +498,8 @@ module alu(
                 out2 = 0;
 
            end
+           
+           //same as above but unsigned
            MODU: begin
                 out1 = divu_remain;
                 divu_ack = internal_ack;
@@ -482,7 +507,8 @@ module alu(
                 out2 = 0;
 
            end
-
+            
+            //dont want ot change anything but flags
            CMP : begin
                 flags = adder_flags;
 

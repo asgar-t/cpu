@@ -38,11 +38,14 @@ module divider_signed(
     );                                                                                           
     wire nreset;
     reg internal_reset;
-    assign nreset = !(reset || internal_reset);                                                                                      
+    assign nreset = !(reset || internal_reset);    //either internally set or externally set reset 
+    
+    //states                                                                                 
     parameter IDLE = 2'b00;                                                                      
     parameter DIVIDING = 2'b01;                                                                  
-    parameter DONE = 2'b11;                                                                      
-                                                                                                 
+    parameter DONE = 2'b11;
+    
+    //data for ip core                                                                                     
     wire [63:0] div_result;                                                                       
     reg [31:0] divisor;                                                                          
     reg [31:0] dividend;                                                                         
@@ -64,11 +67,12 @@ module divider_signed(
         .s_axis_dividend_tready(dividend_ready),
         .aresetn(nreset)                                                        
     );                                                                                           
-                                                                                                 
+                
+     //check that divider is ready to recieve input                                                                             
     assign div_ready = dividend_ready && divisor_ready;
                                                                              
     always @(posedge clk) begin                                                 
-                                                                                                 
+        //reset values                                                                                         
         if (reset) begin                                                                         
             quot <= 0;                                                                        
             remainder <= 0;                                                                       
@@ -82,27 +86,27 @@ module divider_signed(
             case (state)                                                                             
                 IDLE: begin
                     internal_reset <= 1'b0;                                                           
+                                                 
                                                                           
-                    if (start || internal_start) begin  
-                                              
-                                                                          
+                    if (start || internal_start) begin 
+                             //getting ready for divider to start                   
                             done <= 1'b0;                                                            
                             dividend <= a;                                                           
                             divisor <= b;
-                            internal_start <= 1'b1;  
+                            internal_start <= 1'b1;  //set start high
                                                    
-                            if (div_ready && internal_start) begin 
+                            if (div_ready && internal_start) begin //state change, turn start off
                                 internal_start <= 1'b0;
                                 state <= DIVIDING;  
 
                             end                                                     
                     end  
                     else begin
-                        state <= IDLE;
+                        state <= IDLE; //keep waiting since no start signal
                     end                                                                            
                 end                                                                                  
                 DIVIDING: begin  
-                         
+                         //wait till done, once it is done, then store values
                     if (internal_done) begin                                                         
                         remainder <= div_result[31:0];                                                    
                         quot <= div_result[63:32];                                              
@@ -114,7 +118,8 @@ module divider_signed(
                                                              
                     end                                                                              
                 end                                                                                  
-                DONE: begin    
+                DONE: begin  
+                    //hold values until acknowledge from ALU, then we can reset and go back to idle  
                     if (ack) begin                                                                   
                         done <= 1'b0;                                                                
                         state <= IDLE; 
