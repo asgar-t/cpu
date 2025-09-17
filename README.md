@@ -1,4 +1,4 @@
-# Mini CPU in Verilog
+# Mini CPU in Verilog - In Progress
 
 ## Motivation
 I built this project because I wanted to learn Verilog, get hands-on experience with Xilinx Vivado (especially simulation and synthesis tools), and deepen my understanding of computer architecture. By implementing a small CPU from scratch, I gained insight into how instructions are encoded, executed, and tested in hardware.
