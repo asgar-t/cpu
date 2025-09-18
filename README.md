@@ -44,7 +44,7 @@ This CPU currently supports a rich set of operations, including arithmetic, logi
 - `RTR (24)` – Register to register  
 
 ### Branch & Control Flow
-- `JZ (27)` – Jump if zero  
+- `JMP (27)` – Jump (unconditional)  
 - `JNE (28)` – Jump if not equal  
 - `JE (29)` – Jump if equal  
 - `JGT (30)` – Jump if greater than  
