@@ -31,6 +31,8 @@
 //      [25:24] RESERVED
 //      [26] IMM op1 ?
 //      [27] THROW op2 ?
+//      [31:28] DEST REG2 (R1...R7)
+
 
 
 //if LOAD - R -> R
@@ -119,12 +121,12 @@ module cpu_core( //will add more outputs for debug led feature
      
      reg rom_en;
      reg [9:0] rom_addr;
-     wire [31:0] inst_reg;
+     wire [31:0] rom_dout;
      cpu_rom cpu_rom(
         .clka(sys_clk),
         .ena(rom_en),
         .addra(rom_addr),
-        .douta(inst_reg)  
+        .douta(roun_dout)  
      
      );
      
@@ -157,6 +159,9 @@ module cpu_core( //will add more outputs for debug led feature
      parameter EX1 = 4'd14;
      parameter EX2 = 4'd15;
      
+     reg [31:0] inst_reg;
+     
+     
      //opcodes
      //opcodes less than 20 are for the alu
      parameter LIL = 5'd20; //load imm lower
@@ -166,7 +171,7 @@ module cpu_core( //will add more outputs for debug led feature
      parameter RTR = 5'd24;//register to register
      parameter LAL = 5'd25; // load addr lower
      parameter LAU = 5'd26;
-     parameter JZ  = 5'd27;//jump instructions
+     parameter JMP  = 5'd27;//jump instructions
      parameter JNE = 5'd28;
      parameter JE  = 5'd29;
      parameter JGT = 5'd30;
@@ -180,17 +185,54 @@ module cpu_core( //will add more outputs for debug led feature
     parameter WAITING = 2'b01;
     parameter ONE_DELAY = 2'b10;
     
+    
+    //since rom access takes one cycle, we do not want to wait an extra cycle every time,
+    //so as long as the current instruction is not a jump one, we can just get the next one ready
+    //in the mean time
+    //however this means that the starting logic should be fixed so that we wait one cycle
+    
+    
+    
+    //NOTE TO SELF
+    //if cur= jump instr and flag is set, check in this block?
+    // work out timing to verify
+    
+    //ALSO - make first instruction (ROM entry) 32'b0, so and in main FSM, check if inst_reg == 0,
+    //this way no need for first instruction logic due to first delay, very simple 
+    //and only lose one clock cycle
+    //it is also important to note here we are only updating the address, not changing the
+    //inst_reg
+    always @(posedge sys_clk or posedge reset) begin
+        if (reset) rom_addr <=0;
+        
+        else if ((state == START) && (inst_reg < 27)) begin //if not a jump instr
+            rom_addr <= rom_addr + 1;
+        end
+        //here, put the code handling jump instructions, it should be straightforward since
+        //we get the jump instruction, and then when we go to check, ww fail the inst_reg < 27
+        // then we check flags (which will have been set from prev op), and then
+        //update accordingly
+        
+    end
+    
     always @(posedge sys_clk or posedge reset) begin
     
         if (reset) begin
-            rom_addr <= 0; //reset rom address, and therefore instruction register as well
+            state <= START; //reset rom address, and therefore instruction register as well
             
         end
         else begin
+            
+        end
         
             if(state == START) begin
-                ram_we = 4'b0;//reset ram write incase we want to read only
+                alu_ack <= 0;
                 
+                
+                //set ram write enable to zero, unless we are going to write
+                if(inst_reg[4:0] != RTM) ram_we = 4'b0;
+
+                                
                 if (inst_reg[4:0] < 20) begin
                 //alu operation, give opcode and start instruction
                     alu_opcode <= inst_reg[4:0];
@@ -202,13 +244,15 @@ module cpu_core( //will add more outputs for debug led feature
                     LIL: begin
                         //load lower bits of register with cooresponding value
                         regs[IMM][15:0] <= inst_reg[26:11];
-                        rom_addr <= rom_addr +1; //increment instruction pointer
+                        inst_reg <= rom_dout;
+                        //rom_addr <= rom_addr +1; //increment instruction pointer
                     end
                     
                     //same as above but for upper bits
                     LIU: begin
                         regs[IMM][31:16] <= inst_reg[26:11];
-                        rom_addr <= rom_addr +1; 
+                        inst_reg <= rom_dout;
+                        //rom_addr <= rom_addr +1; 
                     end
                     //register to memory
                     RTM: begin
@@ -221,61 +265,76 @@ module cpu_core( //will add more outputs for debug led feature
                         
                         //data fed by registed designated by instructino
                         ram_din <= regs[inst_reg[13:11]];
-                        state <= ONE_DELAY; //ram access takes one cycle
+                        inst_reg <= rom_dout;
                     end
                     MTR: begin
                     //write enable is 0 for read only
                         ram_we <= 4'b0;
                         ram_en <= 1'b1;
                         ram_addr <= regs[ADDR];
-                        regs[inst_reg[13:11]] <= ram_dout;
+                        //we do not assign here since the data is not ready yet
                         state <= ONE_DELAY; //ram access takes one delay
                     end
                     
                     //
                     RTR: begin
                         regs[inst_reg[13:11]] <= regs[inst_reg[18:16]];
+                        inst_reg <= rom_dout;
                     end
                     
                     //reset is a work in progress
                     LAL: begin
                         regs[ADDR][15:0] <= inst_reg[26:11];
+                        inst_reg <= rom_dout;
                         
                     end
                     LAU: begin
+                        regs[ADDR][31:16] <= inst_reg[26:11];
+                        inst_reg <= rom_dout;
+
                     end
-                    JZ : begin
-                    end
-                    JNE: begin
-                    end
-                    JE : begin
-                    end
-                    JGT: begin
-                    end
-                    JLT: begin
-                    end
+                    
+//                    JNE: begin
+//                    end
+//                    JE : begin
+//                    end
+//                    JGT: begin
+//                    end
+//                    JLT: begin
+//                    end
                 
                 endcase
                 
             end
             
-            if (state == WAITING) begin
+            else if (state == WAITING) begin
                 alu_start <= 1'b0;
                 if (alu_done) begin
-                    //regs[
+                    regs[inst_reg[13:11]] <= alu_out1;
+                    regs[inst_reg[31:28]] <= alu_out2;
+                    inst_reg <= rom_dout;
+                    state <= START;
                     
+                                       
                 end
                 else begin
                     state <= WAITING;
+                    regs[inst_reg[13:11]] <= ram_dout;
+                    inst_reg <= rom_dout;
                 end
                 
             end
+            else if (state == ONE_DELAY) begin
+                
+                    
+            
+            end
         
         
-        end
+    end
         
     
-    end
+    
           
      
      
