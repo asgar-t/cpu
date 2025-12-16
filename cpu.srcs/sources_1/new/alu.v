@@ -239,17 +239,20 @@ module alu(
                                 state  <= WAITING;
                                 internal_done <= 1; //set because of only 1 cycle delay,
                                 //the module that does this (adder) does not have a done flag, so we set it manually
-                                
+                                flags = adder_flags;
+
                             end
                             //for these cases. supply inputs and start signal to multiplier
                             MULS,
                             MULU : begin
-                            
+                                internal_done = mult_product_ready;
+                                mult_ack = internal_ack;
+
                                 mult_start <= 1'b1;
                                 mult_op1 <= op1;
                                 mult_op2 <= op2;
                                 mult_sign <= (opcode == MULS); //signed or unsigned depedning on opcode
-  
+                                
                                 state <= WAITING;    
                                        
                             end
@@ -258,7 +261,10 @@ module alu(
                             
                             DIVS,
                             MODS  : begin
-                                
+                                flags = {2'b0, divs_zero_flag, 1'b0};
+                                divs_ack = internal_ack;   
+                                internal_done = divs_done;
+
                                 if(op2 == 0)begin //check for div by zero
                                     div_by_zero <= 1'b1;
                                     done<=1'b1;
@@ -279,7 +285,10 @@ module alu(
                             //once again, same as before but for unsigned division
                             MODU,
                             DIVU  : begin
-                            
+                                flags = {2'b0, divu_zero_flag, 1'b0};
+                                divu_ack = internal_ack;   
+                                internal_done = divu_done;
+
                                 if(op2 == 0)begin //check for div by zero
                                     div_by_zero <= 1'b1;
                                     done<=1'b1;
@@ -338,9 +347,9 @@ module alu(
                                 adder_op2 <= op2;
                                 adder_cin <= 1'b0;
                                 adder_sub <= 1'b1;
-                                flags <= adder_flags;
+                                flags = adder_flags;
                                 internal_done <= 1'b1;
-
+                                
                                 state <= WAITING;
                             end
                             
@@ -422,7 +431,6 @@ module alu(
             DEC: begin
                 out1 = adder_output;
                 out2 = 0;
-                flags = adder_flags;
             //logic operations handled here, and then
             //final outputs get assigned synchronously
             end
@@ -465,22 +473,14 @@ module alu(
            MULU,
            MULS: begin
                 {out2, out1} = mult_result;
-                mult_ack = internal_ack;
-                internal_done = mult_product_ready;
                 
            //dividing modules, set similar to multiplication operations
            end
            DIVU: begin
                 {out2,out1} = {divu_remain, divu_quot};
-                divu_ack = internal_ack;   
-                internal_done = divu_done;
-                flags = {2'b0, divu_zero_flag, 1'b0};
            end
            DIVS: begin
                 {out2,out1} = {divs_remain, divs_quot};
-                divs_ack = internal_ack;   
-                internal_done = divs_done;
-                flags = {2'b0, divs_zero_flag, 1'b0};
            end
            
            //absolute value, one cycle, no need for anything else
@@ -493,8 +493,6 @@ module alu(
            //remained output of the divider
            MODS: begin
                 out1 = divs_remain;
-                divs_ack = internal_ack;
-                internal_done = divs_done;
                 out2 = 0;
 
            end
@@ -502,17 +500,11 @@ module alu(
            //same as above but unsigned
            MODU: begin
                 out1 = divu_remain;
-                divu_ack = internal_ack;
-                internal_done = divu_done;
                 out2 = 0;
 
            end
             
-            //dont want ot change anything but flags
-           CMP : begin
-                flags = adder_flags;
-
-           end
+   
 
             
         endcase

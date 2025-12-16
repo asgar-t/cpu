@@ -65,8 +65,7 @@ module cpu_core( //will add more outputs for debug led feature
     //first part of this module is just declaring the different alu components, as well as 
     //instantiating ip cores for ROM and RAM
     
-    reg alu_op1;
-     reg alu_op2;
+     reg [31:0] alu_op1, alu_op2;
      reg alu_start;    
      reg alu_ack;        
      reg [4:0] alu_opcode;
@@ -101,7 +100,7 @@ module cpu_core( //will add more outputs for debug led feature
      reg [31:0] ram_addr;
      reg [3:0] ram_we;
      reg [31:0] ram_din;
-     wire [31:0] dout;
+     wire [31:0] ram_dout;
      wire ram_rst_busy;
      
      
@@ -109,7 +108,7 @@ module cpu_core( //will add more outputs for debug led feature
         .clka(sys_clk), 
         .rsta(ram_rst), 
         .ena(ram_en),
-        .wea(ram_wea),
+        .wea(ram_we),
         .addra(ram_addr),
         .dina(ram_din),
         .douta(ram_dout),
@@ -126,7 +125,7 @@ module cpu_core( //will add more outputs for debug led feature
         .clka(sys_clk),
         .ena(rom_en),
         .addra(rom_addr),
-        .douta(roun_dout)  
+        .douta(rom_dout)  
      
      );
      
@@ -184,6 +183,7 @@ module cpu_core( //will add more outputs for debug led feature
     parameter START = 2'b00;
     parameter WAITING = 2'b01;
     parameter ONE_DELAY = 2'b10;
+    parameter JUMPING = 2'b11;
     
     
     //since rom access takes one cycle, we do not want to wait an extra cycle every time,
@@ -197,7 +197,7 @@ module cpu_core( //will add more outputs for debug led feature
     //if cur= jump instr and flag is set, check in this block?
     // work out timing to verify
     
-    //ALSO - make first instruction (ROM entry) 32'b0, so and in main FSM, check if inst_reg == 0,
+    //ALSO - make first (few?) instruction(s?) (ROM entry) 32'b0, so and in main FSM, check if inst_reg == 0,
     //this way no need for first instruction logic due to first delay, very simple 
     //and only lose one clock cycle
     //it is also important to note here we are only updating the address, not changing the
@@ -205,15 +205,49 @@ module cpu_core( //will add more outputs for debug led feature
     always @(posedge sys_clk or posedge reset) begin
         if (reset) rom_addr <=0;
         
-        else if ((state == START) && (inst_reg < 27)) begin //if not a jump instr
-            rom_addr <= rom_addr + 1;
+        else if (state == START)begin
+            if (inst_reg[4:0] < 27) begin //if not a jump instr
+                rom_addr <= rom_addr + 1;
+                inst_reg <= rom_dout;
+            end
+            else begin
+                case(inst_reg[4:0])
+                    JNE: begin
+                        if(~alu_flags[1]) begin
+                            rom_addr <= regs[ADDR];
+                        end
+                    end
+                    JE : begin
+                        if(alu_flags[1]) begin
+                            rom_addr <= regs[ADDR];
+                        end
+                    end
+                    JGT: begin
+                        if(~alu_flags[0]) begin
+                            rom_addr <= regs[ADDR];
+                        end
+                    end
+                    JLT: begin
+                         if(alu_flags[0]) begin
+                            rom_addr <= regs[ADDR];
+                        end
+                    end                
+                  
+                endcase
+            
+            end
+            
         end
-        //here, put the code handling jump instructions, it should be straightforward since
-        //we get the jump instruction, and then when we go to check, ww fail the inst_reg < 27
-        // then we check flags (which will have been set from prev op), and then
-        //update accordingly
+        else if (state == JUMPING) begin
+            rom_addr <= rom_addr + 1;
+            inst_reg <= rom_dout;
+        end
         
     end
+    
+    
+    
+    reg [2:0] out1,out2;
     
     always @(posedge sys_clk or posedge reset) begin
     
@@ -222,8 +256,6 @@ module cpu_core( //will add more outputs for debug led feature
             
         end
         else begin
-            
-        end
         
             if(state == START) begin
                 alu_ack <= 0;
@@ -237,6 +269,9 @@ module cpu_core( //will add more outputs for debug led feature
                 //alu operation, give opcode and start instruction
                     alu_opcode <= inst_reg[4:0];
                     alu_start <= 1;
+                    out1 <= inst_reg[13:11];
+                    out2 <= inst_reg[31:28];
+
                     state <= WAITING;
                 end
                 //other cases
@@ -244,14 +279,12 @@ module cpu_core( //will add more outputs for debug led feature
                     LIL: begin
                         //load lower bits of register with cooresponding value
                         regs[IMM][15:0] <= inst_reg[26:11];
-                        inst_reg <= rom_dout;
                         //rom_addr <= rom_addr +1; //increment instruction pointer
                     end
                     
                     //same as above but for upper bits
                     LIU: begin
                         regs[IMM][31:16] <= inst_reg[26:11];
-                        inst_reg <= rom_dout;
                         //rom_addr <= rom_addr +1; 
                     end
                     //register to memory
@@ -265,13 +298,13 @@ module cpu_core( //will add more outputs for debug led feature
                         
                         //data fed by registed designated by instructino
                         ram_din <= regs[inst_reg[13:11]];
-                        inst_reg <= rom_dout;
                     end
                     MTR: begin
                     //write enable is 0 for read only
-                        ram_we <= 4'b0;
                         ram_en <= 1'b1;
                         ram_addr <= regs[ADDR];
+                        
+                        out1 <= inst_reg[13:11];
                         //we do not assign here since the data is not ready yet
                         state <= ONE_DELAY; //ram access takes one delay
                     end
@@ -279,29 +312,41 @@ module cpu_core( //will add more outputs for debug led feature
                     //
                     RTR: begin
                         regs[inst_reg[13:11]] <= regs[inst_reg[18:16]];
-                        inst_reg <= rom_dout;
                     end
                     
                     //reset is a work in progress
                     LAL: begin
                         regs[ADDR][15:0] <= inst_reg[26:11];
-                        inst_reg <= rom_dout;
                         
                     end
                     LAU: begin
                         regs[ADDR][31:16] <= inst_reg[26:11];
-                        inst_reg <= rom_dout;
 
                     end
-                    
-//                    JNE: begin
-//                    end
-//                    JE : begin
-//                    end
-//                    JGT: begin
-//                    end
-//                    JLT: begin
-//                    end
+                    JNE: begin
+                        if(~alu_flags[1]) begin
+                            state <= JUMPING;
+                        end
+                        else state <= START;
+                    end
+                    JE : begin
+                        if(alu_flags[1]) begin
+                            state <= JUMPING;
+                        end
+                        else state <= START;
+                    end
+                    JGT: begin
+                        if(~alu_flags[0]) begin
+                            state <= JUMPING;
+                        end
+                        else state <= START;
+                    end
+                    JLT: begin
+                         if(alu_flags[0]) begin
+                            state <= JUMPING;
+                        end
+                        else state <= START;                       
+                    end                
                 
                 endcase
                 
@@ -310,26 +355,24 @@ module cpu_core( //will add more outputs for debug led feature
             else if (state == WAITING) begin
                 alu_start <= 1'b0;
                 if (alu_done) begin
-                    regs[inst_reg[13:11]] <= alu_out1;
-                    regs[inst_reg[31:28]] <= alu_out2;
-                    inst_reg <= rom_dout;
+                    regs[out1] <= alu_out1;
+                    regs[out2] <= alu_out2;
                     state <= START;
                     
                                        
                 end
-                else begin
-                    state <= WAITING;
-                    regs[inst_reg[13:11]] <= ram_dout;
-                    inst_reg <= rom_dout;
-                end
+
                 
             end
             else if (state == ONE_DELAY) begin
-                
-                    
+                state <= START;
             
             end
-        
+            else if (state == JUMPING) begin
+                state <= START;
+                
+            end
+        end
         
     end
         
@@ -337,15 +380,7 @@ module cpu_core( //will add more outputs for debug led feature
     
           
      
-     
-     
-     
-     
-     
-     
-     
-     
-     
+   
   
     
 endmodule
