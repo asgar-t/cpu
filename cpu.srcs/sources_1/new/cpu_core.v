@@ -118,7 +118,9 @@ module cpu_core( //will add more outputs for debug led feature
      
      
      
-     reg rom_en;
+     wire rom_en;
+     assign rom_en = 1;
+
      reg [9:0] rom_addr;
      wire [31:0] rom_dout;
      cpu_rom cpu_rom(
@@ -128,7 +130,6 @@ module cpu_core( //will add more outputs for debug led feature
         .douta(rom_dout)  
      
      );
-     
      
      //registers
      reg [31:0] regs [0:15];
@@ -203,15 +204,20 @@ module cpu_core( //will add more outputs for debug led feature
     //it is also important to note here we are only updating the address, not changing the
     //inst_reg
     always @(posedge sys_clk or posedge reset) begin
-        if (reset) rom_addr <=0;
+        if (reset) begin
+            rom_addr <=0;
+            inst_reg <= 0;
+            
+        end
         
-        else if (state == START)begin
+        else if ((state == START)) begin
             if (inst_reg[4:0] < 27) begin //if not a jump instr
                 rom_addr <= rom_addr + 1;
                 inst_reg <= rom_dout;
             end
             else begin
                 case(inst_reg[4:0])
+                    JMP: rom_addr <= regs[ADDR];
                     JNE: begin
                         if(~alu_flags[1]) begin
                             rom_addr <= regs[ADDR];
@@ -253,11 +259,26 @@ module cpu_core( //will add more outputs for debug led feature
     
         if (reset) begin
             state <= START; //reset rom address, and therefore instruction register as well
-            
+            regs[0] = 32'b0;
+            regs[1] = 32'b0;
+            regs[2] = 32'b0;
+            regs[3] = 32'b0;
+            regs[4] = 32'b0;
+            regs[5] = 32'b0;
+            regs[6] = 32'b0;
+            regs[7] = 32'b0;
+            regs[8] = 32'b0;
+            regs[9] = 32'b0;
+            regs[10] = 32'b0;
+            regs[11] = 32'b0;
+            regs[12] = 32'b0;
+            regs[13] = 32'b0;
+            regs[14] = 32'b0;
+            regs[15] = 32'b0;
         end
         else begin
         
-            if(state == START) begin
+            if(state == START && (rom_addr != 0)) begin
                 alu_ack <= 0;
                 
                 
@@ -323,6 +344,7 @@ module cpu_core( //will add more outputs for debug led feature
                         regs[ADDR][31:16] <= inst_reg[26:11];
 
                     end
+                    JMP: state <= JUMPING;
                     JNE: begin
                         if(~alu_flags[1]) begin
                             state <= JUMPING;
